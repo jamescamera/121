@@ -19,6 +19,9 @@
     width: 100%;
     height: 100%;
   }
+  button {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
   #hint {
     position: fixed;
     left: 0;
@@ -40,7 +43,6 @@
     position: fixed;
     top: max(16px, env(safe-area-inset-top));
     right: max(16px, env(safe-area-inset-right));
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 11px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -50,15 +52,127 @@
     border-radius: 999px;
     padding: 7px 14px;
     cursor: pointer;
-    transition: color 0.2s ease, border-color 0.2s ease;
+    transition: color 0.2s ease, border-color 0.2s ease, opacity 0.3s ease;
   }
   #blinkToggle:hover {
     color: rgba(255, 255, 255, 0.8);
     border-color: rgba(255, 255, 255, 0.6);
   }
-  #blinkToggle:focus-visible {
-    outline: 1px solid rgba(255, 60, 60, 0.8);
-    outline-offset: 2px;
+  #playBtn {
+    position: fixed;
+    left: 50%;
+    bottom: 12vh;
+    transform: translateX(-50%);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #f2f2f2;
+    background: rgba(255, 30, 30, 0.12);
+    border: 1px solid rgba(255, 60, 60, 0.65);
+    border-radius: 999px;
+    padding: 11px 26px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+  #playBtn:hover {
+    background: rgba(255, 30, 30, 0.22);
+  }
+  #playBtn:active {
+    transform: translateX(-50%) scale(0.96);
+  }
+  [hidden] {
+    display: none !important;
+  }
+  #hud {
+    position: fixed;
+    top: max(20px, env(safe-area-inset-top));
+    left: 0;
+    right: 0;
+    text-align: center;
+    pointer-events: none;
+  }
+  #statusLabel {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.85);
+    transition: color 0.15s ease;
+  }
+  #statusLabel.danger {
+    color: #ff3b3b;
+  }
+  #scoreLabel {
+    margin-top: 6px;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    font-variant-numeric: tabular-nums;
+  }
+  #gameOverlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(2px);
+  }
+  #gameOverlay .panel {
+    text-align: center;
+    padding: 40px 44px;
+  }
+  #gameOverlay h1 {
+    margin: 0 0 18px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: #ff3b3b;
+    text-shadow: 0 0 22px rgba(255, 30, 30, 0.65);
+  }
+  #gameOverlay p {
+    margin: 4px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+    font-variant-numeric: tabular-nums;
+  }
+  #gameOverlay .btnRow {
+    margin-top: 26px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  #gameOverlay button {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 11px 24px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  #retryBtn {
+    color: #f2f2f2;
+    background: rgba(255, 30, 30, 0.18);
+    border: 1px solid rgba(255, 60, 60, 0.7);
+  }
+  #retryBtn:hover {
+    background: rgba(255, 30, 30, 0.3);
+  }
+  #exitBtn {
+    color: rgba(255, 255, 255, 0.6);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+  #exitBtn:hover {
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.6);
   }
 </style>
 </head>
@@ -66,12 +180,37 @@
 <canvas id="c"></canvas>
 <div id="hint">move &middot; touch &middot; watch</div>
 <button id="blinkToggle" type="button" aria-pressed="true">blink: on</button>
+<button id="playBtn" type="button">&#9654; play: don't get caught</button>
+<div id="hud" hidden>
+  <div id="statusLabel">EYES CLOSED</div>
+  <div id="scoreLabel">SCORE 0 &middot; BEST 0</div>
+</div>
+<div id="gameOverlay" hidden>
+  <div class="panel">
+    <h1>CAUGHT</h1>
+    <p id="finalScore">Score: 0</p>
+    <p id="finalBest">Best: 0</p>
+    <div class="btnRow">
+      <button id="retryBtn" type="button">retry</button>
+      <button id="exitBtn" type="button">exit</button>
+    </div>
+  </div>
+</div>
 <script>
 (function () {
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
   const hint = document.getElementById('hint');
   const blinkToggle = document.getElementById('blinkToggle');
+  const playBtn = document.getElementById('playBtn');
+  const hud = document.getElementById('hud');
+  const statusLabel = document.getElementById('statusLabel');
+  const scoreLabel = document.getElementById('scoreLabel');
+  const gameOverlay = document.getElementById('gameOverlay');
+  const finalScore = document.getElementById('finalScore');
+  const finalBest = document.getElementById('finalBest');
+  const retryBtn = document.getElementById('retryBtn');
+  const exitBtn = document.getElementById('exitBtn');
 
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
   let W = 0, H = 0;
@@ -93,6 +232,72 @@
   // pointer state
   let pointer = { x: 0, y: 0, active: false };
   let idleAngle = 0;
+
+  // --- "Don't Get Caught" game state ---
+  const CATCH_THRESHOLD = 16; // px of movement allowed during a danger phase
+  const game = {
+    state: 'menu', // 'menu' | 'safe' | 'danger' | 'gameover'
+    score: 0,
+    best: Number(localStorage.getItem('eyeGameBest') || 0),
+    phaseEnd: 0,
+    anchorX: 0,
+    anchorY: 0,
+    openAmt: 1
+  };
+
+  function safeDuration(score) {
+    return Math.max(700, 2400 - score * 80) + Math.random() * 500;
+  }
+  function dangerDuration(score) {
+    return Math.min(2600, 1000 + score * 60) + Math.random() * 400;
+  }
+
+  function setUiForMenu() {
+    playBtn.hidden = false;
+    blinkToggle.hidden = false;
+    hud.hidden = true;
+    gameOverlay.hidden = true;
+  }
+  function setUiForPlaying() {
+    playBtn.hidden = true;
+    blinkToggle.hidden = true;
+    hud.hidden = false;
+    gameOverlay.hidden = true;
+  }
+  function updateHud() {
+    scoreLabel.textContent = 'SCORE ' + game.score + ' · BEST ' + game.best;
+  }
+
+  function startGame() {
+    game.state = 'safe';
+    game.score = 0;
+    game.phaseEnd = performance.now() + 3000; // grace period to get oriented
+    statusLabel.textContent = 'EYES CLOSED — MOVE FREELY';
+    statusLabel.classList.remove('danger');
+    updateHud();
+    setUiForPlaying();
+  }
+
+  function triggerGameOver() {
+    if (game.state !== 'safe' && game.state !== 'danger') return;
+    game.state = 'gameover';
+    if (game.score > game.best) {
+      game.best = game.score;
+      localStorage.setItem('eyeGameBest', String(game.best));
+    }
+    finalScore.textContent = 'Score: ' + game.score;
+    finalBest.textContent = 'Best: ' + game.best;
+    gameOverlay.hidden = false;
+  }
+
+  function exitToMenu() {
+    game.state = 'menu';
+    setUiForMenu();
+  }
+
+  playBtn.addEventListener('click', startGame);
+  retryBtn.addEventListener('click', startGame);
+  exitBtn.addEventListener('click', exitToMenu);
 
   function resize() {
     W = window.innerWidth;
@@ -159,6 +364,13 @@
   }
 
   function setPointer(x, y) {
+    if (game.state === 'danger') {
+      const dx = x - game.anchorX;
+      const dy = y - game.anchorY;
+      if (Math.hypot(dx, dy) > CATCH_THRESHOLD) {
+        triggerGameOver();
+      }
+    }
     pointer.x = x;
     pointer.y = y;
     pointer.active = true;
@@ -217,7 +429,7 @@
 
     if (openAmt < 0.18) return; // too closed to show a pupil
 
-    // pupil direction toward pointer, clamped inside the eye
+    // pupil direction toward gaze target, clamped inside the eye
     const dx = px - cx;
     const dy = py - cy;
     const dist = Math.hypot(dx, dy) || 1;
@@ -244,11 +456,7 @@
     ctx.restore();
   }
 
-  function tick(now) {
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, W, H);
-
+  function tickMenu(now) {
     let px = pointer.x, py = pointer.y;
     if (!pointer.active) {
       idleAngle += 0.006;
@@ -262,7 +470,6 @@
     for (const id in pairs) {
       const pair = pairs[id];
       if (!blinkEnabled) {
-        // keep the schedule from backing up so blinking resumes smoothly when re-enabled
         if (now > pair.nextBlink) pair.nextBlink = now + Math.random() * 7000 + 1500;
         pair.blinking = false;
         openByPair[id] = 1;
@@ -290,6 +497,51 @@
       const openAmt = openByPair[eye.pairId];
       const redTarget = eye.pairId === closestPair ? 1 : 0;
       drawEye(eye, openAmt, px, py, redTarget);
+    }
+  }
+
+  function tickGame(now) {
+    if (game.state === 'safe' || game.state === 'danger') {
+      if (now > game.phaseEnd) {
+        if (game.state === 'safe') {
+          game.state = 'danger';
+          game.anchorX = pointer.x;
+          game.anchorY = pointer.y;
+          game.phaseEnd = now + dangerDuration(game.score);
+          statusLabel.textContent = "DON'T MOVE";
+          statusLabel.classList.add('danger');
+        } else {
+          game.score++;
+          updateHud();
+          game.state = 'safe';
+          game.phaseEnd = now + safeDuration(game.score);
+          statusLabel.textContent = 'EYES CLOSED — MOVE FREELY';
+          statusLabel.classList.remove('danger');
+        }
+      }
+    }
+
+    const openTarget = (game.state === 'safe') ? 0.08 : 1;
+    game.openAmt += (openTarget - game.openAmt) * 0.3;
+
+    const gazeX = (game.state === 'danger' || game.state === 'gameover') ? game.anchorX : pointer.x;
+    const gazeY = (game.state === 'danger' || game.state === 'gameover') ? game.anchorY : pointer.y;
+    const redTarget = (game.state === 'danger' || game.state === 'gameover') ? 1 : 0;
+
+    for (const eye of eyes) {
+      drawEye(eye, game.openAmt, gazeX, gazeY, redTarget);
+    }
+  }
+
+  function tick(now) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    if (game.state === 'menu') {
+      tickMenu(now);
+    } else {
+      tickGame(now);
     }
 
     requestAnimationFrame(tick);
