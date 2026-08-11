@@ -89,7 +89,7 @@
 <button id="blinkToggle" type="button" aria-pressed="true">blink: on</button>
 <div id="densityControl">
   <label for="densitySlider">eyes</label>
-  <input type="range" id="densitySlider" min="26" max="90" step="2" value="46" />
+  <input type="range" id="densitySlider" min="14" max="90" step="2" value="46" />
 </div>
 <script>
 (function () {
@@ -150,8 +150,8 @@
     const eyeW = eyeSize;                    // eye width
     const eyeH = eyeSize * (30 / 46);        // eye height
     const withinPairGap = eyeSize * (14 / 46); // gap between the two eyes in a pair
-    const pairGap = eyeSize;                 // gap between pairs
-    const rowGap = eyeSize * (8 / 46);       // vertical gap between rows
+    const pairGap = eyeSize * (26 / 46);     // gap between pairs
+    const rowGap = eyeSize * (4 / 46);       // vertical gap between rows
 
     const pairSpan = eyeW * 2 + withinPairGap;
     const groupSpan = pairSpan + pairGap;
