@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Watching</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  #hint {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 6vh;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+    pointer-events: none;
+    transition: opacity 1.2s ease;
+  }
+  #hint.hidden {
+    opacity: 0;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">move &middot; touch &middot; watch</div>
+<script>
+(function () {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const hint = document.getElementById('hint');
+
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let W = 0, H = 0;
+  let eyes = [];
+
+  // pointer state
+  let pointer = { x: 0, y: 0, active: false };
+  let idleAngle = 0;
+
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!pointer.active) {
+      pointer.x = W / 2;
+      pointer.y = H / 2;
+    }
+    buildGrid();
+  }
+
+  function buildGrid() {
+    eyes = [];
+
+    const eyeW = 46;   // eye width
+    const eyeH = 30;   // eye height
+    const withinPairGap = 14;  // gap between the two eyes in a pair
+    const pairGap = 46;        // gap between pairs
+    const rowGap = 20;         // vertical gap between rows
+
+    const pairSpan = eyeW * 2 + withinPairGap;
+    const groupSpan = pairSpan + pairGap;
+
+    const cols = Math.max(1, Math.ceil((W + pairGap) / groupSpan));
+    const rowSpan = eyeH + rowGap;
+    const rows = Math.max(1, Math.ceil(H / rowSpan) + 1);
+
+    const totalW = cols * groupSpan - pairGap;
+    const offsetX = (W - totalW) / 2 + eyeW / 2;
+    const totalH = rows * rowSpan - rowGap;
+    const offsetY = (H - totalH) / 2 + eyeH / 2;
+
+    let pairId = 0;
+    for (let r = 0; r < rows; r++) {
+      const cy = offsetY + r * rowSpan;
+      for (let g = 0; g < cols; g++) {
+        const groupX = offsetX + g * groupSpan;
+        pairId++;
+        for (let p = 0; p < 2; p++) {
+          const cx = groupX + p * (eyeW + withinPairGap);
+          eyes.push({
+            x: cx,
+            y: cy,
+            w: eyeW,
+            h: eyeH,
+            pairId: pairId,
+            nextBlink: performance.now() + Math.random() * 6000 + 500,
+            blinkStart: 0,
+            blinkDur: 220 + Math.random() * 80,
+            blinking: false,
+            redAmt: 0
+          });
+        }
+      }
+    }
+  }
+
+  function setPointer(x, y) {
+    pointer.x = x;
+    pointer.y = y;
+    pointer.active = true;
+    if (!hint.classList.contains('hidden')) hint.classList.add('hidden');
+  }
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('pointermove', (e) => setPointer(e.clientX, e.clientY), { passive: true });
+  window.addEventListener('pointerdown', (e) => setPointer(e.clientX, e.clientY), { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    if (e.touches[0]) setPointer(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+
+  function findClosestPair(px, py) {
+    let bestPair = null;
+    let bestDist = Infinity;
+    const centers = {};
+    for (const eye of eyes) {
+      if (!centers[eye.pairId]) centers[eye.pairId] = { sx: 0, sy: 0, n: 0 };
+      const c = centers[eye.pairId];
+      c.sx += eye.x; c.sy += eye.y; c.n++;
+    }
+    for (const id in centers) {
+      const c = centers[id];
+      const mx = c.sx / c.n, my = c.sy / c.n;
+      const d = (mx - px) * (mx - px) + (my - py) * (my - py);
+      if (d < bestDist) { bestDist = d; bestPair = Number(id); }
+    }
+    return bestPair;
+  }
+
+  function drawEye(eye, openAmt, px, py, redTarget) {
+    const { x: cx, y: cy, w, h } = eye;
+    const halfW = w / 2;
+    const halfH = (h / 2) * openAmt;
+
+    eye.redAmt += (redTarget - eye.redAmt) * 0.12;
+    const red = eye.redAmt;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx - halfW, cy);
+    ctx.quadraticCurveTo(cx, cy - halfH * 1.5, cx + halfW, cy);
+    ctx.quadraticCurveTo(cx, cy + halfH * 1.5, cx - halfW, cy);
+    ctx.closePath();
+
+    const glow = red * 14;
+    if (glow > 0.5) {
+      ctx.shadowColor = 'rgba(255,30,30,0.9)';
+      ctx.shadowBlur = glow;
+    }
+    ctx.fillStyle = '#f2f2f2';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    if (openAmt < 0.18) return; // too closed to show a pupil
+
+    // pupil direction toward pointer, clamped inside the eye
+    const dx = px - cx;
+    const dy = py - cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const maxOffX = halfW * 0.42;
+    const maxOffY = halfH * 0.42;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const pupilX = cx + nx * maxOffX;
+    const pupilY = cy + ny * maxOffY * (openAmt);
+
+    const pupilR = Math.min(halfW, Math.max(halfH, 1)) * 0.36 * openAmt + 1;
+
+    const black = [20, 20, 20];
+    const redC = [255, 20, 20];
+    const rr = black[0] + (redC[0] - black[0]) * red;
+    const gg = black[1] + (redC[1] - black[1]) * red;
+    const bb = black[2] + (redC[2] - black[2]) * red;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(pupilX, pupilY, pupilR, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${rr | 0}, ${gg | 0}, ${bb | 0})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function tick(now) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    let px = pointer.x, py = pointer.y;
+    if (!pointer.active) {
+      idleAngle += 0.006;
+      px = W / 2 + Math.cos(idleAngle) * W * 0.28;
+      py = H / 2 + Math.sin(idleAngle * 0.8) * H * 0.22;
+    }
+
+    const closestPair = findClosestPair(px, py);
+
+    for (const eye of eyes) {
+      if (!eye.blinking && now > eye.nextBlink) {
+        eye.blinking = true;
+        eye.blinkStart = now;
+      }
+      let openAmt = 1;
+      if (eye.blinking) {
+        const t = (now - eye.blinkStart) / eye.blinkDur;
+        if (t >= 1) {
+          eye.blinking = false;
+          eye.nextBlink = now + Math.random() * 7000 + 1500;
+          openAmt = 1;
+        } else {
+          openAmt = t < 0.5 ? 1 - (t / 0.5) : (t - 0.5) / 0.5;
+        }
+      }
+      const redTarget = eye.pairId === closestPair ? 1 : 0;
+      drawEye(eye, openAmt, px, py, redTarget);
+    }
+
+    requestAnimationFrame(tick);
+  }
+
+  resize();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
