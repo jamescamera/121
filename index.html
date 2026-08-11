@@ -151,7 +151,7 @@
     const eyeH = eyeSize * (30 / 46);        // eye height
     const withinPairGap = eyeSize * (14 / 46); // gap between the two eyes in a pair
     const pairGap = eyeSize;                 // gap between pairs
-    const rowGap = eyeSize * (20 / 46);      // vertical gap between rows
+    const rowGap = eyeSize * (8 / 46);       // vertical gap between rows
 
     const pairSpan = eyeW * 2 + withinPairGap;
     const groupSpan = pairSpan + pairGap;
@@ -256,14 +256,14 @@
       const dx = px - cx;
       const dy = py - cy;
       const dist = Math.hypot(dx, dy) || 1;
-      const maxOffX = halfW * 0.62;
-      const maxOffY = halfH * 0.62;
+      const maxOffX = halfW * 0.56;
+      const maxOffY = halfH * 0.56;
       const nx = dx / dist;
       const ny = dy / dist;
       const pupilX = cx + nx * maxOffX;
       const pupilY = cy + ny * maxOffY * openAmt;
 
-      const pupilR = Math.min(halfW, Math.max(halfH, 1)) * 0.8 * openAmt + 2;
+      const pupilR = Math.min(halfW, Math.max(halfH, 1)) * 0.55 * openAmt + 1.5;
 
       const black = [20, 20, 20];
       const redC = [255, 20, 20];
