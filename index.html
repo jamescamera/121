@@ -278,6 +278,7 @@
   function buildGrid() {
     eyes = [];
     pairs = {};
+    activePairId = null;
 
     const eyeW = eyeSize;                    // eye width
     const eyeH = eyeSize * (30 / 46);        // eye height
@@ -338,6 +339,8 @@
     if (e.touches[0]) setPointer(e.touches[0].clientX, e.touches[0].clientY);
   }, { passive: true });
 
+  let activePairId = null; // sticky selection, see findClosestPair below
+
   function findClosestPair(px, py) {
     let bestPair = null;
     let bestDist = Infinity;
@@ -354,6 +357,22 @@
       const d = (mx - px) * (mx - px) + (my - py) * (my - py);
       if (d < bestDist) { bestDist = d; bestPair = Number(id); bestX = mx; bestY = my; }
     }
+
+    // hysteresis: when the wandering point sits almost equidistant between two
+    // pairs, don't flicker between them every frame - only steal the highlight
+    // when a candidate is meaningfully closer than the currently active pair.
+    if (activePairId != null && centers[activePairId] && activePairId !== bestPair) {
+      const c = centers[activePairId];
+      const mx = c.sx / c.n, my = c.sy / c.n;
+      const curDist = (mx - px) * (mx - px) + (my - py) * (my - py);
+      if (bestDist > curDist * 0.55) {
+        bestPair = activePairId;
+        bestX = mx;
+        bestY = my;
+      }
+    }
+    activePairId = bestPair;
+
     return { id: bestPair, x: bestX, y: bestY };
   }
 
@@ -412,8 +431,8 @@
       const dx = px - cx;
       const dy = py - cy;
       const dist = Math.hypot(dx, dy) || 1;
-      const maxOffX = halfW * 0.56;
-      const maxOffY = halfH * 0.56;
+      const maxOffX = halfW * 0.8;
+      const maxOffY = halfH * 0.8;
       const nx = dx / dist;
       const ny = dy / dist;
       // as an eye turns red it locks its gaze dead ahead, staring straight at you
@@ -421,7 +440,7 @@
       const pupilX = cx + nx * maxOffX * trackAmt;
       const pupilY = cy + ny * maxOffY * openAmt * trackAmt;
 
-      const pupilR = Math.min(halfW, Math.max(halfH, 1)) * 0.55 * openAmt + 1.5;
+      const pupilR = Math.min(halfW, Math.max(halfH, 1)) * 0.42 * openAmt + 1.5;
 
       const black = [20, 20, 20];
       const redC = [255, 20, 20];
