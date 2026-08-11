@@ -50,6 +50,7 @@
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
   let W = 0, H = 0;
   let eyes = [];
+  let pairs = {};
 
   // pointer state
   let pointer = { x: 0, y: 0, active: false };
@@ -72,6 +73,7 @@
 
   function buildGrid() {
     eyes = [];
+    pairs = {};
 
     const eyeW = 46;   // eye width
     const eyeH = 30;   // eye height
@@ -97,6 +99,12 @@
       for (let g = 0; g < cols; g++) {
         const groupX = offsetX + g * groupSpan;
         pairId++;
+        pairs[pairId] = {
+          nextBlink: performance.now() + Math.random() * 6000 + 500,
+          blinkStart: 0,
+          blinkDur: 220 + Math.random() * 80,
+          blinking: false
+        };
         for (let p = 0; p < 2; p++) {
           const cx = groupX + p * (eyeW + withinPairGap);
           eyes.push({
@@ -105,10 +113,6 @@
             w: eyeW,
             h: eyeH,
             pairId: pairId,
-            nextBlink: performance.now() + Math.random() * 6000 + 500,
-            blinkStart: 0,
-            blinkDur: 220 + Math.random() * 80,
-            blinking: false,
             redAmt: 0
           });
         }
@@ -179,14 +183,14 @@
     const dx = px - cx;
     const dy = py - cy;
     const dist = Math.hypot(dx, dy) || 1;
-    const maxOffX = halfW * 0.42;
-    const maxOffY = halfH * 0.42;
+    const maxOffX = halfW * 0.58;
+    const maxOffY = halfH * 0.58;
     const nx = dx / dist;
     const ny = dy / dist;
     const pupilX = cx + nx * maxOffX;
     const pupilY = cy + ny * maxOffY * (openAmt);
 
-    const pupilR = Math.min(halfW, Math.max(halfH, 1)) * 0.36 * openAmt + 1;
+    const pupilR = Math.min(halfW, Math.max(halfH, 1)) * 0.5 * openAmt + 1.5;
 
     const black = [20, 20, 20];
     const redC = [255, 20, 20];
@@ -216,22 +220,29 @@
 
     const closestPair = findClosestPair(px, py);
 
-    for (const eye of eyes) {
-      if (!eye.blinking && now > eye.nextBlink) {
-        eye.blinking = true;
-        eye.blinkStart = now;
+    const openByPair = {};
+    for (const id in pairs) {
+      const pair = pairs[id];
+      if (!pair.blinking && now > pair.nextBlink) {
+        pair.blinking = true;
+        pair.blinkStart = now;
       }
       let openAmt = 1;
-      if (eye.blinking) {
-        const t = (now - eye.blinkStart) / eye.blinkDur;
+      if (pair.blinking) {
+        const t = (now - pair.blinkStart) / pair.blinkDur;
         if (t >= 1) {
-          eye.blinking = false;
-          eye.nextBlink = now + Math.random() * 7000 + 1500;
+          pair.blinking = false;
+          pair.nextBlink = now + Math.random() * 7000 + 1500;
           openAmt = 1;
         } else {
           openAmt = t < 0.5 ? 1 - (t / 0.5) : (t - 0.5) / 0.5;
         }
       }
+      openByPair[id] = openAmt;
+    }
+
+    for (const eye of eyes) {
+      const openAmt = openByPair[eye.pairId];
       const redTarget = eye.pairId === closestPair ? 1 : 0;
       drawEye(eye, openAmt, px, py, redTarget);
     }
