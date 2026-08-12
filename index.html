@@ -439,11 +439,12 @@
       const dx = px - cx;
       const dy = py - cy;
       const dist = Math.hypot(dx, dy) || 1;
-      // pushed past the eye's own geometric half-size on purpose - the clip
-      // (above) keeps it visually contained, but this ensures even a modest
-      // angle produces an offset large enough to actually read at a glance
-      const maxOffX = halfW * 1.35;
-      const maxOffY = halfH * 1.35;
+      // NOTE: the lens shape tapers to a point at +-halfW and its actual peak
+      // height is only ~0.75*halfH (from the quadratic curve control points),
+      // so these must stay well inside those bounds - otherwise the pupil
+      // circle lands entirely outside the clip path and vanishes.
+      const maxOffX = halfW * 0.7;
+      const maxOffY = halfH * 0.6;
       const nx = dx / dist;
       const ny = dy / dist;
       // as an eye turns red it locks its gaze dead ahead, staring straight at you
