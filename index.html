@@ -261,8 +261,13 @@
   let idleAngle = 0;
 
   function resize() {
-    W = window.innerWidth;
-    H = window.innerHeight;
+    // mobile browsers can report a window.innerHeight taller than what's
+    // actually visible (collapsible address bar), so prefer the visualViewport
+    // when available - keeps the grid, and the gaze target, matched to what's
+    // really on screen instead of extending below the fold.
+    const vv = window.visualViewport;
+    W = vv ? vv.width : window.innerWidth;
+    H = vv ? vv.height : window.innerHeight;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px';
@@ -333,6 +338,9 @@
   }
 
   window.addEventListener('resize', resize);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', resize);
+  }
   window.addEventListener('pointermove', (e) => setPointer(e.clientX, e.clientY), { passive: true });
   window.addEventListener('pointerdown', (e) => setPointer(e.clientX, e.clientY), { passive: true });
   window.addEventListener('touchmove', (e) => {
@@ -431,8 +439,11 @@
       const dx = px - cx;
       const dy = py - cy;
       const dist = Math.hypot(dx, dy) || 1;
-      const maxOffX = halfW * 0.8;
-      const maxOffY = halfH * 0.8;
+      // pushed past the eye's own geometric half-size on purpose - the clip
+      // (above) keeps it visually contained, but this ensures even a modest
+      // angle produces an offset large enough to actually read at a glance
+      const maxOffX = halfW * 1.35;
+      const maxOffY = halfH * 1.35;
       const nx = dx / dist;
       const ny = dy / dist;
       // as an eye turns red it locks its gaze dead ahead, staring straight at you
@@ -512,6 +523,9 @@
   }
 
   resize();
+  // mobile address bars can still be settling their collapsed/expanded state
+  // right after load - one more pass shortly after catches that
+  setTimeout(resize, 300);
   requestAnimationFrame(tick);
 })();
 </script>
