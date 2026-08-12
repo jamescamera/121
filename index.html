@@ -323,7 +323,9 @@
             w: eyeW,
             h: eyeH,
             pairId: pairId,
-            redAmt: 0
+            redAmt: 0,
+            gazeX: cx,
+            gazeY: cy
           });
         }
       }
@@ -355,8 +357,9 @@
     let bestX = px, bestY = py;
     const centers = {};
     for (const eye of eyes) {
-      if (!centers[eye.pairId]) centers[eye.pairId] = { sx: 0, sy: 0, n: 0 };
-      const c = centers[eye.pairId];
+      let c = centers[eye.pairId];
+      if (!c) { c = centers[eye.pairId] = { sx: 0, sy: 0, n: 0, a: null, b: null }; }
+      if (c.n === 0) c.a = eye; else c.b = eye;
       c.sx += eye.x; c.sy += eye.y; c.n++;
     }
     for (const id in centers) {
@@ -381,7 +384,8 @@
     }
     activePairId = bestPair;
 
-    return { id: bestPair, x: bestX, y: bestY };
+    const winner = centers[bestPair];
+    return { id: bestPair, x: bestX, y: bestY, eyeA: winner ? winner.a : null, eyeB: winner ? winner.b : null };
   }
 
   // how strongly the beat-wave ring touches a point at (ex, ey) at time `now` (ms)
@@ -517,9 +521,26 @@
       const openAmt = openByPair[eye.pairId];
       const redTarget = eye.pairId === closestPair ? 1 : 0;
       const wave = soundEnabled ? waveGlowAt(eye.x, eye.y, now, closest.x, closest.y, maxRadius) : 0;
-      // gaze target is the red pair's own midpoint, not the raw pointer/wander
-      // point, so every eye converges on exactly where the red eyes visually are
-      drawEye(eye, openAmt, closest.x, closest.y, redTarget, wave);
+
+      // gaze target is whichever of the two red eyes is nearer to THIS eye
+      // (not their shared midpoint) - eyes right beside the pair look at the
+      // actual near pupil, matching how eyes track a nearby feature in real life
+      let targetX = closest.x, targetY = closest.y;
+      if (closest.eyeA && closest.eyeB) {
+        const dA = (eye.x - closest.eyeA.x) ** 2 + (eye.y - closest.eyeA.y) ** 2;
+        const dB = (eye.x - closest.eyeB.x) ** 2 + (eye.y - closest.eyeB.y) ** 2;
+        const nearer = dA <= dB ? closest.eyeA : closest.eyeB;
+        targetX = nearer.x;
+        targetY = nearer.y;
+      }
+
+      // ease toward the target instead of snapping straight to it, so motion
+      // stays fluid even when the target hops (a new pair takes the highlight,
+      // idle wander loops around, etc.)
+      eye.gazeX += (targetX - eye.gazeX) * 0.14;
+      eye.gazeY += (targetY - eye.gazeY) * 0.14;
+
+      drawEye(eye, openAmt, eye.gazeX, eye.gazeY, redTarget, wave);
     }
 
     requestAnimationFrame(tick);
