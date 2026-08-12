@@ -517,7 +517,9 @@
       const openAmt = openByPair[eye.pairId];
       const redTarget = eye.pairId === closestPair ? 1 : 0;
       const wave = soundEnabled ? waveGlowAt(eye.x, eye.y, now, closest.x, closest.y, maxRadius) : 0;
-      drawEye(eye, openAmt, px, py, redTarget, wave);
+      // gaze target is the red pair's own midpoint, not the raw pointer/wander
+      // point, so every eye converges on exactly where the red eyes visually are
+      drawEye(eye, openAmt, closest.x, closest.y, redTarget, wave);
     }
 
     requestAnimationFrame(tick);
